@@ -1,5 +1,5 @@
 'use strict';
-const APP_VERSION='3.2.0'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
+const APP_VERSION='3.2.1'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
 const starter=(name,device='Kabelstation')=>({id:uid(),name,devices:[device],targetSets:3,targetReps:12});
 const exercise=(name,sets,reps,guide,device='Kabelstation')=>({...starter(name,device),targetSets:sets,targetReps:parseInt(reps,10),repRange:reps,guide,notes:''});
 const latestPlan=()=>({
@@ -72,9 +72,53 @@ function history(){ $('app').innerHTML=`<h2>Trainingshistorie</h2>${db.sessions.
 function progress(){let exercises=[...new Map([...db.sessions.flatMap(s=>s.exercises),...allExercises()].map(e=>[e.exerciseId||e.id,{id:e.exerciseId||e.id,name:e.name}])).values()];if(!exercises.some(e=>e.id===chartExercise))chartExercise=exercises[0]?.id||'';let devices=[...new Set(db.sessions.flatMap(s=>s.exercises.filter(e=>e.exerciseId===chartExercise).map(e=>e.device)))];if(chartDevice&&!devices.includes(chartDevice))chartDevice='';let pts=db.sessions.slice().reverse().flatMap(s=>s.exercises.filter(e=>e.exerciseId===chartExercise&&(!chartDevice||e.device===chartDevice)).map(e=>({date:s.date,max:Math.max(...e.sets.map(x=>x.weight)),volume:e.sets.reduce((a,x)=>a+x.weight*x.reps,0),reps:e.sets.reduce((a,x)=>a+x.reps,0)})));$('app').innerHTML=`<h2>Voortgang</h2><div class="card"><label>Oefening</label><select id="chartEx">${exercises.map(e=>`<option value="${esc(e.id)}" ${e.id===chartExercise?'selected':''}>${esc(e.name)}</option>`).join('')}</select><div class="space"></div><label>Apparaat</label><select id="chartDev"><option value="">Alle apparaten (niet rechtstreeks vergelijkbaar)</option>${devices.map(d=>`<option ${chartDevice===d?'selected':''}>${esc(d)}</option>`).join('')}</select></div><div class="card"><h3>Hoogste gewicht per training</h3><canvas id="chart" width="640" height="280"></canvas><p class="muted">Filter op één apparaat voor een betrouwbare vergelijking.</p></div><div class="grid"><div class="card"><div class="muted">Laatste topgewicht</div><div class="stat">${pts.length?pts.at(-1).max+' kg':'–'}</div></div><div class="card"><div class="muted">Laatste volume</div><div class="stat">${pts.length?Math.round(pts.at(-1).volume)+' kg':'–'}</div></div></div><div class="card"><h3>Historische meetpunten</h3>${pts.length?pts.slice().reverse().map(p=>`<p>${new Date(p.date).toLocaleDateString('nl-NL')} · ${fmt(p.max)} kg max · ${p.reps} reps · ${Math.round(p.volume)} kg volume</p>`).join(''):'Nog geen gegevens voor deze selectie.'}</div>`;$('chartEx').onchange=e=>{chartExercise=e.target.value;chartDevice='';render()};$('chartDev').onchange=e=>{chartDevice=e.target.value;render()};drawChart(pts)}
 function drawChart(pts){let c=$('chart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle='#aab9ce';ctx.font='20px system-ui';if(!pts.length){ctx.fillText('Nog geen meetpunten',20,130);return}let vals=pts.map(x=>x.max),lo=Math.max(0,Math.min(...vals)-5),hi=Math.max(...vals)+5;if(hi===lo)hi=lo+1;ctx.strokeStyle='#40516d';ctx.lineWidth=1;for(let k=0;k<5;k++){let y=20+k*55;ctx.beginPath();ctx.moveTo(50,y);ctx.lineTo(620,y);ctx.stroke();ctx.fillText((hi-(hi-lo)*k/4).toFixed(1),3,y+5)}ctx.strokeStyle='#63d5af';ctx.lineWidth=4;ctx.beginPath();vals.forEach((v,i)=>{let x=pts.length===1?330:50+i*570/(pts.length-1),y=240-(v-lo)/(hi-lo)*220;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();ctx.fillStyle='#80edc7';vals.forEach((v,i)=>{let x=pts.length===1?330:50+i*570/(pts.length-1),y=240-(v-lo)/(hi-lo)*220;ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fill()})}
 function backup(){ $('app').innerHTML=`<h2>Back-up en privacy</h2><div class="card"><h3>Je gegevens blijven lokaal</h3><p>Deze app gebruikt lokale browseropslag. Er is geen account of serverdatabase. Verwijder je websitegegevens of de app, dan kun je gegevens kwijtraken.</p><button id="export">Download JSON-back-up</button></div><div class="card"><h3>Back-up terugzetten</h3><p class="muted">Let op: import vervangt alle huidige trainingsgegevens.</p><input type="file" id="import" accept=".json,application/json"></div><div class="card"><h3>App-instellingen</h3><label>Titel bovenaan de app</label><input id="customTitle" maxlength="45" value="${esc(db.title)}"><div class="actions"><button id="saveTitle">Titel opslaan</button><button class="secondary" id="checkUpdates">Controleer updates</button></div><p>Geïnstalleerde versie: <strong>${APP_VERSION}</strong></p><p id="updateStatus" class="muted"></p><p>Bewaar regelmatig een back-up in Bestanden of iCloud Drive. Trainingsgegevens worden niet naar GitHub gestuurd.</p></div>`;$('saveTitle').onclick=()=>{db.title=$('customTitle').value.trim()||'Gym Progress';save();render()};$('checkUpdates').onclick=async()=>{if(!swRegistration){$('updateStatus').textContent='Geen offline-serviceworker gevonden.';return} $('updateStatus').textContent='Controleren…';try{await swRegistration.update();$('updateStatus').textContent=updateReady?'Nieuwe versie beschikbaar.':'Je hebt de nieuwste beschikbare versie.';showUpdateBanner()}catch(e){$('updateStatus').textContent='Controle mislukt. Controleer je internetverbinding.'}};$('export').onclick=()=>{let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='gym-progress-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};$('import').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let x=JSON.parse(await f.text());if(!x.plans||!Array.isArray(x.plans.A)||!Array.isArray(x.plans.B)||!Array.isArray(x.sessions))throw Error('Ongeldig formaat');if(confirm('Huidige gegevens vervangen door deze back-up?')){db=x;active=null;save();render();alert('Back-up geïmporteerd')}}catch(err){alert('Import mislukt: '+err.message)}}}
-function showUpdateBanner(){let b=document.getElementById('updateBanner');if(!b)return;b.hidden=!updateReady;}
-function setupUpdates(){if(!('serviceWorker'in navigator))return;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(sessionStorage.getItem('gym-update-pending')==='yes'){sessionStorage.removeItem('gym-update-pending');location.reload()}});navigator.serviceWorker.register('./sw.js').then(reg=>{swRegistration=reg;const watch=()=>{if(reg.waiting&&navigator.serviceWorker.controller){updateReady=true;showUpdateBanner()}};watch();reg.addEventListener('updatefound',()=>{const w=reg.installing;if(w)w.addEventListener('statechange',watch)});reg.update().catch(console.warn);document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(console.warn)})}).catch(console.warn)}
-document.getElementById('applyUpdate').onclick=()=>{if(swRegistration?.waiting){sessionStorage.setItem('gym-update-pending','yes');swRegistration.waiting.postMessage({type:'SKIP_WAITING'})}};
+function newerVersion(candidate){
+ const parts=v=>String(v||'').split('.').map(x=>Number(x)||0);
+ const a=parts(candidate),b=parts(APP_VERSION);
+ for(let i=0;i<Math.max(a.length,b.length);i++){if((a[i]||0)!==(b[i]||0))return (a[i]||0)>(b[i]||0)}
+ return false;
+}
+async function checkWaitingVersion(reg){
+ updateReady=false;
+ const worker=reg?.waiting;
+ if(worker&&navigator.serviceWorker.controller){
+  try{
+   const version=await new Promise((resolve,reject)=>{
+    const channel=new MessageChannel();const timeout=setTimeout(()=>{channel.port1.close();reject(Error('Timeout'))},2500);
+    channel.port1.onmessage=e=>{clearTimeout(timeout);channel.port1.close();resolve(e.data?.version)};
+    worker.postMessage({type:'GET_VERSION'},[channel.port2]);
+   });
+   updateReady=newerVersion(version);
+  }catch(e){console.warn('Versiecontrole niet gelukt:',e)}
+ }
+ showUpdateBanner();
+}
+function showUpdateBanner(){let b=document.getElementById('updateBanner');if(b)b.hidden=!updateReady;}
+function setupUpdates(){
+ if(!('serviceWorker'in navigator))return;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+  updateReady=false;showUpdateBanner();
+  if(sessionStorage.getItem('gym-update-pending')==='yes'){
+   sessionStorage.removeItem('gym-update-pending');location.reload();
+  }
+ });
+ navigator.serviceWorker.register('./sw.js').then(reg=>{
+  swRegistration=reg;
+  const watch=()=>{checkWaitingVersion(reg)};
+  watch();reg.addEventListener('updatefound',()=>{
+   const worker=reg.installing;
+   if(worker)worker.addEventListener('statechange',watch);
+  });
+  reg.update().catch(console.warn);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(console.warn)});
+ }).catch(console.warn);
+}
+document.getElementById('applyUpdate').onclick=()=>{
+ if(updateReady&&swRegistration?.waiting){
+  sessionStorage.setItem('gym-update-pending','yes');
+  swRegistration.waiting.postMessage({type:'SKIP_WAITING'});
+ }
+};
 window.addEventListener('load',setupUpdates);render();
 
 // FIT Activity writer: standalone, offline, no third-party libraries.
