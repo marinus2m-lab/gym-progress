@@ -1,6 +1,6 @@
 const CACHE='gym-progress-cache-v3-2-1';
-const APP_VERSION='3.2.1';
-const ASSETS=['./','./index.html','./app.js?v=3.2.1','./manifest.webmanifest','./icon.png'];
+const APP_VERSION='3.2.2';
+const ASSETS=['./','./index.html','./app.js?v=3.2.2','./manifest.webmanifest','./icon.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('gym-progress-cache-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();if(event.data?.type==='GET_VERSION')event.ports?.[0]?.postMessage({version:APP_VERSION})});

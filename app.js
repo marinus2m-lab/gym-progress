@@ -1,5 +1,5 @@
 'use strict';
-const APP_VERSION='3.2.1'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
+const APP_VERSION='3.2.2'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
 const starter=(name,device='Kabelstation')=>({id:uid(),name,devices:[device],targetSets:3,targetReps:12});
 const exercise=(name,sets,reps,guide,device='Kabelstation')=>({...starter(name,device),targetSets:sets,targetReps:parseInt(reps,10),repRange:reps,guide,notes:''});
 const latestPlan=()=>({
@@ -135,9 +135,19 @@ function exportStravaFit(session){
   const field=(n,size,type)=>{u8(n);u8(size);u8(type)};
   const def=(local,global,fields)=>{u8(0x40|local);u8(0);u8(0);u16(global);u8(fields.length);fields.forEach(f=>field(...f))};
   const msg=(local,writer)=>{u8(local);writer()};
-  // file_id: type=activity, time_created
+  // File ID (activity) and timer start/stop events.
   def(0,0,[[0,1,0],[4,4,0x86]]);msg(0,()=>{u8(4);u32(fitTime(start))});
-  // set: repetitions, weight in kg, set_type=active, start_time
+  def(4,21,[[253,4,0x86],[0,1,0],[1,1,0]]);
+  msg(4,()=>{u32(fitTime(start));u8(0);u8(0)}); // timer start
+  // A record stream is essential for many activity importers (including Strava).
+  // No invented GPS, heart rate, power or distance values.
+  def(5,20,[[253,4,0x86]]);
+  const recordInterval=30;
+  for(let seconds=0;seconds<elapsed;seconds+=recordInterval){
+   msg(5,()=>u32(fitTime(start)+seconds));
+  }
+  msg(5,()=>u32(fitTime(start)+elapsed));
+  // Strength set records: repetition count and weight in kilograms.
   def(1,225,[[3,2,0x84],[4,4,0x88],[5,1,0],[6,4,0x86]]);
   let totalSets=0;
   for(const ex of session.exercises||[]){for(const set of ex.sets||[]){
@@ -146,10 +156,12 @@ function exportStravaFit(session){
    msg(1,()=>{u16(Math.min(65534,Math.round(reps)));const f=new DataView(new ArrayBuffer(4));f.setFloat32(0,weight,true);for(let i=0;i<4;i++)u8(f.getUint8(i));u8(0);u32(fitTime(start)+Math.min(elapsed-1,totalSets*30))});totalSets++;
   }}
   if(!totalSets)throw Error('Deze training heeft geen geldige sets');
-  // session: sport=training (10), sub_sport=strength_training (20), elapsed/timer times in milliseconds
+  msg(4,()=>{u32(fitTime(start)+elapsed);u8(0);u8(1)}); // timer stop
+  // Session: start_time, sport=training, sub_sport=strength_training,
+  // total_elapsed_time and total_timer_time in milliseconds, end timestamp.
   def(2,18,[[2,4,0x86],[5,1,0],[6,1,0],[7,4,0x86],[8,4,0x86],[253,4,0x86]]);
   msg(2,()=>{u32(fitTime(start));u8(10);u8(20);u32(elapsed*1000);u32(elapsed*1000);u32(fitTime(start)+elapsed)});
-  // activity: total_timer_time, num_sessions, type=manual, event=activity, event_type=stop, timestamp
+  // Activity summary; type=manual (0), event=activity (26), event_type=stop (1).
   def(3,34,[[0,4,0x86],[1,2,0x84],[2,1,0],[3,1,0],[4,1,0],[253,4,0x86]]);
   msg(3,()=>{u32(elapsed*1000);u16(1);u8(0);u8(26);u8(1);u32(fitTime(start)+elapsed)});
   const header=[14,0x20,0,0,data.length&255,(data.length>>8)&255,(data.length>>16)&255,(data.length>>24)&255,46,70,73,84];
@@ -158,6 +170,6 @@ function exportStravaFit(session){
   const body=header.concat(data);const fc=crc(body);body.push(fc&255,fc>>8);
   const blob=new Blob([new Uint8Array(body)],{type:'application/octet-stream'}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download='gym-progress-training-'+session.plan+'-'+start.toISOString().slice(0,10)+'.fit';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
-  alert('FIT-bestand gedownload. Upload het via strava.com/upload/select. Controleer na het uploaden de activiteit: sommige kabeloefeningen kunnen in Strava als onbekend verschijnen.');
+  alert('FIT-bestand gedownload. Upload via strava.com/upload/select. Dit formaat bevat nu tijdrecords. Strava-acceptatie en weergave van sets moeten nog worden getest.');
  }catch(err){alert('FIT-export mislukt: '+err.message)}
 }
