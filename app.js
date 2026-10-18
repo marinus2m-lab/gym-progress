@@ -1,5 +1,5 @@
 'use strict';
-const APP_VERSION='3.5.0'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
+const APP_VERSION='3.5.1'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
 const starter=(name,device='Kabelstation')=>({id:uid(),name,devices:[device],targetSets:3,targetReps:12});
 const exercise=(name,sets,reps,guide,device='Kabelstation')=>({...starter(name,device),targetSets:sets,targetReps:parseInt(reps,10),repRange:reps,guide,notes:''});
 const latestPlan=()=>({
@@ -79,13 +79,34 @@ function allExercises(){return [...db.plans.A,...db.plans.B]}
 function nav(){ $('nav').innerHTML=[['home','Home'],['plans','Schema'],['history','Historie'],['progress','Voortgang'],['backup','Meer']].map(([t,l])=>`<button class="${tab===t?'active':''}" data-tab="${t}">${({home:'⌂',plans:'▤',history:'◷',progress:'▥',backup:'☷'})[t]}<span>${l}</span></button>`).join('');document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()})}
 function render(){document.getElementById('appTitle').textContent='▰ '+(db.title||'Gym Progress');document.title=db.title||'Gym Progress';nav();({home,plans,history,progress,backup})[tab]();showUpdateBanner();}
 function home(){
- const last=db.sessions[0];
  const recent=db.sessions.filter(s=>Date.now()-new Date(s.date).getTime()<28*86400000);
  const sets=recent.reduce((n,s)=>n+s.exercises.reduce((a,e)=>a+e.sets.length,0),0);
  const volume=recent.reduce((n,s)=>n+s.exercises.reduce((a,e)=>a+e.sets.reduce((v,x)=>v+(Number(x.weight)||0)*(Number(x.reps)||0),0),0),0);
  const count=recent.length;
- $('app').innerHTML=`<div class="home-hero"><div class="hero-glow"></div><div class="hero-overline">JOUW TRAINING • JOUW PROGRESSIE</div><div class="hero-title">Word elke<br><em>training sterker.</em></div><p>Leg je sets vast. Zie wat je bereikt.</p><div class="hero-tag">✦ KLAAR VOOR JE VOLGENDE SESSIE</div></div><div class="section-head"><h2>Start een training</h2><span>Jouw schema</span></div><div class="workout-list">${['A','B'].map(p=>`<button class="workout-tile workout-${p}" data-start="${p}"><span class="workout-symbol">${p}</span><span class="workout-info"><strong>Training ${p}</strong><small>${p==='A'?'Borst · Schouders · Triceps':'Rug · Biceps · Core'}<br>${db.plans[p].length} oefeningen</small></span><span class="workout-arrow">↗</span></button>`).join('')}</div>${active?'<button class="resume-cta" id="resume">▶ Hervat je lopende training <span>→</span></button>':''}<div class="section-head"><h2>Jouw vooruitgang</h2><span>Laatste 4 weken</span></div><div class="metric-grid"><div class="metric-card"><div class="metric-icon">▥</div><strong>${count}</strong><small>Trainingen</small></div><div class="metric-card"><div class="metric-icon">✓</div><strong>${sets}</strong><small>Sets gedaan</small></div><div class="metric-card"><div class="metric-icon">↗</div><strong>${volume>=1000?(volume/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})+'k':Math.round(volume)}</strong><small>Volume (kg)</small></div></div><div class="section-head"><h2>Laatste training</h2><button class="text-link" id="goHistory">Bekijk alles →</button></div><div class="last-workout"><span class="last-icon">◷</span><div><strong>${last?'Training '+esc(last.plan):'Nog geen training'}</strong><small>${last?new Date(last.date).toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'})+' · '+last.exercises.length+' oefeningen':'Start je eerste sessie hierboven'}</small></div><span class="last-chevron">›</span></div>`;
- document.querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>start(b.dataset.start));if($('resume'))$('resume').onclick=()=>drawSession();$('goHistory').onclick=()=>{tab='history';render()};
+ const lastByPlan=p=>db.sessions.filter(s=>s.plan===p).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+ const recentCards=['A','B'].map(p=>{
+  const session=lastByPlan(p),ongoing=active?.plan===p;
+  const subtitle=ongoing?'Bezig · tik om verder te gaan':session?new Date(session.date).toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})+' · '+session.exercises.length+' oefeningen':'Nog geen afgeronde training';
+  const action=ongoing?'Hervatten':session?'Resultaten bekijken':'Starten';
+  return `<button class="recent-workout" data-recent-plan="${p}" aria-label="Training ${p}: ${action}"><span class="recent-letter recent-${p}">${p}</span><span class="recent-info"><strong>Training ${p}</strong><small>${esc(subtitle)}</small></span><span class="recent-action">${action} <span aria-hidden="true">›</span></span></button>`;
+ }).join('');
+ $('app').innerHTML=`<div class="home-hero"><div class="hero-glow"></div><div class="hero-overline">JOUW TRAINING • JOUW PROGRESSIE</div><div class="hero-title">Word elke<br><em>training sterker.</em></div><p>Leg je sets vast. Zie wat je bereikt.</p></div><div class="section-head"><h2>Start een training</h2><span>Jouw schema</span></div><div class="workout-list">${['A','B'].map(p=>`<button class="workout-tile workout-${p}" data-start="${p}"><span class="workout-symbol">${p}</span><span class="workout-info"><strong>Training ${p}</strong><small>${p==='A'?'Borst · Schouders · Triceps':'Rug · Biceps · Core'}<br>${db.plans[p].length} oefeningen</small></span><span class="workout-arrow">↗</span></button>`).join('')}</div><div class="section-head"><h2>Mijn laatste trainingen</h2><button class="text-link" id="goHistory">Bekijk alles →</button></div><div class="recent-workouts">${recentCards}</div><div class="section-head"><h2>Jouw vooruitgang</h2><span>Laatste 4 weken</span></div><div class="metric-grid"><div class="metric-card"><div class="metric-icon">▥</div><strong>${count}</strong><small>Trainingen</small></div><div class="metric-card"><div class="metric-icon">✓</div><strong>${sets}</strong><small>Sets gedaan</small></div><div class="metric-card"><div class="metric-icon">↗</div><strong>${volume>=1000?(volume/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})+'k':Math.round(volume)}</strong><small>Volume (kg)</small></div></div>`;
+ document.querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>{const p=b.dataset.start;if(active?.plan===p){drawSession();return}start(p)});
+ document.querySelectorAll('[data-recent-plan]').forEach(b=>b.onclick=()=>{
+  const p=b.dataset.recentPlan;
+  if(active?.plan===p){drawSession();return}
+  const session=lastByPlan(p);
+  if(session){showRecentSession(session);return}
+  start(p);
+ });
+ $('goHistory').onclick=()=>{tab='history';render()};
+}
+function showRecentSession(session){
+ const p=session.plan;
+ const rows=(session.exercises||[]).map(e=>`<section class="card"><h3>${esc(e.name)}</h3><p class="muted">${esc(e.device||'')}</p><p>${(e.sets||[]).map(x=>`${fmt(x.weight)} kg × ${esc(x.reps)}`).join(' · ')}</p></section>`).join('');
+ $('app').innerHTML=`<div class="row"><button class="secondary tiny" id="backToHome">← Dashboard</button></div><div class="section-head"><h2>Training ${esc(p)} · laatste sessie</h2></div><p class="muted">${new Date(session.date).toLocaleString('nl-NL')}</p>${session.notes?`<div class="card"><strong>Notities</strong><p>${esc(session.notes)}</p></div>`:''}${rows}<button id="repeatTraining" style="width:100%">Nieuwe training ${esc(p)} starten</button>`;
+ $('backToHome').onclick=()=>{tab='home';render()};
+ $('repeatTraining').onclick=()=>start(p);
 }
 // Gebruik de laatste geregistreerde set op hetzelfde apparaat als gewichtssuggestie.
 // Vul alleen de eerste set in; reps blijven leeg en handmatige invoer wordt niet overschreven.
