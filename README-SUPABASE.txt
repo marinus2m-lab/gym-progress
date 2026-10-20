@@ -1,19 +1,18 @@
-GYM PROGRESS 3.9.0 — VEILIGE CLOUD-BACK-UP (BETA)
+GYM PROGRESS 3.9.1 — AUTOMATISCHE CLOUDSYNC (BETA)
 
-1. Maak in de bestaande app via Meer een JSON-back-up.
-2. Voer supabase-cloud-setup.sql uit in het Vivavos Supabase-project.
-3. Plaats index.html, app.js, cloud.js, sw.js, manifest en iconen samen op je HTTPS-host.
-4. Open de app -> Meer -> Supabase synchronisatie. Log in met je Supabase Authentication-gebruiker.
-5. Op je iPhone met bestaande historie: kies Lokale gegevens naar cloud.
-6. Op een tweede apparaat: kies Cloud naar dit apparaat (na lokale back-up).
+1. Maak eerst op de iPhone een JSON-back-up van je bestaande app.
+2. Publiceer ALLE bestanden in deze ZIP samen via GitHub Pages.
+3. Open Meer → Supabase synchronisatie en log in.
+4. Als je eerder al hebt geüpload, blijft automatische sync actief op hetzelfde apparaat.
+   Controleer de status en maak een kleine testwijziging.
+5. Na elke opgeslagen wijziging synchroniseert de app na circa 1,6 seconden.
+6. Bij netwerkverlies blijft alles lokaal en wordt opnieuw geprobeerd bij verbinding,
+   terugkeer naar de app en periodiek.
+7. Bij conflicten met een andere cloudversie stopt de upload om overschrijven te voorkomen.
+   Download niet blind: maak een JSON-back-up en vergelijk eerst.
+8. Een lopende training (draft) blijft lokaal totdat je de training afrondt.
+9. Geen nieuw SQL-script nodig; gebruikt bestaande gym_cloud_state en RPC.
 
-BELANGRIJK:
-- Geen geheime sleutels in de app; alleen publieke project-URL en publishable key.
-- De bestaande acht tabellen blijven intact. De nieuwe gym_cloud_state-tabel bewaart de volledige PWA-gegevens zonder verlies van eigen velden.
-- Cloud synchroniseert bij save(), niet per afzonderlijke toets. Een lopende training (draft) blijft lokaal tot deze wordt afgerond.
-- Niet tegelijk op twee apparaten werken. Bij een versieconflict stopt synchronisatie. Geen automatische samenvoeging.
-- Offline wijzigingen worden lokaal opgeslagen; synchronisatie wordt opnieuw geprobeerd na een volgende wijziging wanneer online.
-- Bestaande cloud wordt niet automatisch overschreven tijdens eerste upload.
-- De service worker cache is verhoogd naar 3.9.0.
-- Als inloggen mislukt, controleer Authentication -> Providers -> Email en of het account bevestigd is.
-- Dit is een veilige eerste cloud-koppeling, geen volledige migratie naar de acht genormaliseerde tabellen.
+LET OP: synchronisatie is nog snapshot-gebaseerd, zonder samenvoegen van wijzigingen
+van twee apparaten. Gebruik niet tegelijk twee apparaten voor invoer.
+Een record in de cloud alleen bewijst niet dat alle velden kloppen: controleer je historie.
