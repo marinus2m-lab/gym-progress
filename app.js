@@ -1,5 +1,5 @@
 'use strict';
-const APP_VERSION='3.7.0'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
+const APP_VERSION='3.8.0'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
 const starter=(name,device='Kabelstation')=>({id:uid(),name,devices:[device],targetSets:3,targetReps:12});
 const exercise=(name,sets,reps,guide,device='Kabelstation')=>({...starter(name,device),targetSets:sets,targetReps:parseInt(reps,10),repRange:reps,guide,notes:''});
 const latestPlan=()=>({
@@ -77,7 +77,7 @@ const fmt=n=>Number(n).toLocaleString('nl-NL',{maximumFractionDigits:2});
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db))}catch(e){alert('Opslaan mislukt. Maak een back-up en controleer beschikbare opslagruimte.')}}
 function allExercises(){return [...db.plans.A,...db.plans.B,...(db.library||[])]}
 function nav(){ $('nav').innerHTML=[['home','Home'],['plans','Schema'],['library','Bibliotheek'],['history','Historie'],['progress','Voortgang'],['backup','Meer']].map(([t,l])=>`<button class="${tab===t?'active':''}" data-tab="${t}">${({home:'⌂',plans:'▤',history:'◷',progress:'▥',library:'▦',backup:'☷'})[t]}<span>${l}</span></button>`).join('');document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()})}
-function render(){document.getElementById('appTitle').textContent='▰ '+(db.title||'Gym Progress');document.title=db.title||'Gym Progress';nav();({home,plans,library,history,progress,backup})[tab]();showUpdateBanner();}
+function render(){document.getElementById('appTitle').textContent=db.title||'Gym Progress';document.title=db.title||'Gym Progress';nav();({home,plans,library,history,progress,backup})[tab]();showUpdateBanner();}
 
 function library(){
  const all=[...new Map(allExercises().map(e=>[e.id,e])).values()].sort((a,b)=>a.name.localeCompare(b.name));
