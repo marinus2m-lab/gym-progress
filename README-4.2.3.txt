@@ -1,0 +1,1 @@
+Gym Progress 4.2.3 – uniforme leesbare lettergroottes. Basis 16px, hulptekst minimaal 14px, knoppen 14–16px, labels 14–16px. Kleuren en functionaliteit van 4.2.2 behouden. Maak vooraf een JSON-back-up.
