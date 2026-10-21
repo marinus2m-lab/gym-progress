@@ -1,5 +1,5 @@
 'use strict';
-const APP_VERSION='4.1.0'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
+const APP_VERSION='4.2.0'; const KEY='gym-progress-v1';const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());
 const starter=(name,device='Kabelstation')=>({id:uid(),name,devices:[device],targetSets:3,targetReps:12});
 const exercise=(name,sets,reps,guide,device='Kabelstation')=>({...starter(name,device),targetSets:sets,targetReps:parseInt(reps,10),repRange:reps,guide,notes:''});
 const latestPlan=()=>({
@@ -109,9 +109,21 @@ const $=id=>document.getElementById(id);const esc=s=>String(s??'').replace(/[&<>
 const fmt=n=>Number(n).toLocaleString('nl-NL',{maximumFractionDigits:2});
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db));window.gymCloudChanged?.()}catch(e){alert('Opslaan mislukt. Maak een back-up en controleer beschikbare opslagruimte.')}}
 function allExercises(){return [...db.plans.A,...db.plans.B,...(db.library||[])]}
-function nav(){ $('nav').innerHTML=[['home','Home'],['plans','Schema'],['library','Bibliotheek'],['history','Historie'],['progress','Voortgang'],['backup','Meer']].map(([t,l])=>`<button class="${tab===t?'active':''}" data-tab="${t}">${({home:'⌂',plans:'▤',history:'◷',progress:'▥',library:'▦',backup:'☷'})[t]}<span>${l}</span></button>`).join('');document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()})}
-function render(){document.getElementById('appTitle').textContent=db.title||'Gym Progress';document.title=db.title||'Gym Progress';nav();({home,plans,library,history,progress,backup})[tab]();showUpdateBanner();}
-
+function nav(){
+ const tabs=[['home','Trainen','⌂'],['progress','Voortgang','▥'],['manage','Beheren','☷']];
+ const selected=['plans','library','backup'].includes(tab)?'manage':['history'].includes(tab)?'progress':tab;
+ $('nav').innerHTML=tabs.map(([t,l,icon])=>`<button class="${selected===t?'active':''}" data-tab="${t}">${icon}<span>${l}</span></button>`).join('');
+ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});
+}
+function manage(){
+ $('app').innerHTML=`<div class="page-heading"><h2>Beheren</h2><p class="muted">Pas je trainingen en instellingen aan.</p></div><div class="manage-menu">
+ <button data-go="plans"><strong>Trainingsschema's</strong><small>Training A en B aanpassen</small><span>›</span></button>
+ <button data-go="library"><strong>Oefeningenbibliotheek</strong><small>Oefeningen en uitleg beheren</small><span>›</span></button>
+ <button data-go="backup"><strong>Apparaten & instellingen</strong><small>Apparaten, back-up en cloud</small><span>›</span></button></div>`;
+ document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{tab=b.dataset.go;render()});
+}
+function render(){document.getElementById('appTitle').textContent=db.title||'Gym Progress';document.title=db.title||'Gym Progress';nav();({home,plans,library,history,progress,backup,manage})[tab]();goManageBack();showUpdateBanner();}
+function goManageBack(){if(['plans','library','backup'].includes(tab)){$('app').insertAdjacentHTML('afterbegin','<button class="back-link" id="manageBack">‹ Beheren</button>');$('manageBack').onclick=()=>{tab='manage';render()}}}
 function library(){
  const all=[...new Map(allExercises().map(e=>[e.id,e])).values()].sort((a,b)=>a.name.localeCompare(b.name));
  $('app').innerHTML=`<h2>Oefeningenbibliotheek</h2><p class="muted">Alle oefeningen blijven hier beschikbaar, ook buiten je schema.</p><input id="librarySearch" placeholder="Zoek oefening…" aria-label="Zoek oefening"><div id="libraryList"></div><button id="libraryNew">+ Nieuwe oefening</button>`;
@@ -151,7 +163,11 @@ function home(){
   const action=ongoing?'Hervatten':session?'Resultaten bekijken':'Starten';
   return `<button class="recent-workout" data-recent-plan="${p}" aria-label="Training ${p}: ${action}"><span class="recent-letter recent-${p}">${p}</span><span class="recent-info"><strong>Training ${p}</strong><small>${esc(subtitle)}</small></span><span class="recent-action">${action} <span aria-hidden="true">›</span></span></button>`;
  }).join('');
- $('app').innerHTML=`<div class="home-hero"><div class="hero-glow"></div><div class="hero-overline">JOUW TRAINING • JOUW PROGRESSIE</div><div class="hero-title">Word elke<br><em>training sterker.</em></div><p>Leg je sets vast. Zie wat je bereikt.</p></div><div class="section-head"><h2>Start een training</h2><span>Jouw schema</span></div><div class="workout-list">${['A','B'].map(p=>`<button class="workout-tile workout-${p}" data-start="${p}"><span class="workout-symbol">${p}</span><span class="workout-info"><strong>Training ${p}</strong><small>${p==='A'?'Borst · Schouders · Triceps':'Rug · Biceps · Core'}<br>${db.plans[p].length} oefeningen</small></span><span class="workout-arrow">↗</span></button>`).join('')}</div><div class="section-head"><h2>Mijn laatste trainingen</h2><button class="text-link" id="goHistory">Bekijk alles →</button></div><div class="recent-workouts">${recentCards}</div><div class="section-head"><h2>Jouw vooruitgang</h2><span>Laatste 4 weken</span></div><div class="metric-grid"><div class="metric-card"><div class="metric-icon">▥</div><strong>${count}</strong><small>Trainingen</small></div><div class="metric-card"><div class="metric-icon">✓</div><strong>${sets}</strong><small>Sets gedaan</small></div><div class="metric-card"><div class="metric-icon">↗</div><strong>${volume>=1000?(volume/1000).toLocaleString('nl-NL',{maximumFractionDigits:1})+'k':Math.round(volume)}</strong><small>Volume (kg)</small></div></div>`;
+ $('app').innerHTML=`<div class="compact-home-head"><div><div class="eyebrow">GYM PROGRESS</div><h2>Klaar om te trainen?</h2><p class="muted">Kies je training en ga aan de slag.</p></div><img src="fox-mark.png" alt="" aria-hidden="true"></div>
+ ${active?`<button class="resume-cta" id="resumeNow">▶ Training ${esc(active.plan)} hervatten <span>›</span></button>`:''}
+ <div class="workout-list clean-workouts">${['A','B'].map(p=>`<button class="workout-tile workout-${p}" data-start="${p}"><span class="workout-symbol">${p}</span><span class="workout-info"><strong>Training ${p}</strong><small>${p==='A'?'Schouders · Armen · Buik':'Borst · Rug · Benen · Buik'} · ${db.plans[p].length} oefeningen</small></span><span class="workout-arrow">›</span></button>`).join('')}</div>
+ <div class="section-head"><h2>Laatste trainingen</h2><button class="text-link" id="goHistory">Bekijk alles ›</button></div><div class="recent-workouts">${recentCards}</div>`;
+ if(active&&$('resumeNow'))$('resumeNow').onclick=drawSession;
  document.querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>{const p=b.dataset.start;if(active?.plan===p){drawSession();return}checkin(p)});
  document.querySelectorAll('[data-recent-plan]').forEach(b=>b.onclick=()=>{
   const p=b.dataset.recentPlan;
@@ -187,6 +203,27 @@ function isFinished(e){return !e.skipped&&e.sets?.length>0&&e.sets.every(s=>s.do
 function organizeSessionCards(){
  const app=$('app');if(!active||!app)return;
  const cards=[...app.querySelectorAll('[data-session-ex]')];
+ const current=cards.find(c=>{const e=active.exercises[Number(c.dataset.sessionEx)];return !e.skipped&&!isFinished(e)})||cards[0];
+ cards.forEach(card=>{
+  const idx=Number(card.dataset.sessionEx),e=active.exercises[idx];
+  const details=document.createElement('details');details.className='exercise-details';
+  details.open=card===current&&!e.skipped&&!isFinished(e);
+  const summary=document.createElement('summary');summary.className='exercise-summary';
+  const count=e.sets.filter(x=>x.done).length;
+  summary.innerHTML=`<span class="exercise-summary-name">${esc(e.name)}</span><span class="exercise-summary-status">${e.skipped?'Overgeslagen':isFinished(e)?'Afgerond':count+'/'+e.sets.length+' sets'} <span aria-hidden="true">⌄</span></span>`;
+  const content=document.createElement('div');content.className='exercise-content';
+  while(card.firstChild)content.appendChild(card.firstChild);
+  details.append(summary,content);card.appendChild(details);
+  // Advanced controls stay available but no longer dominate the training view.
+  const advanced=document.createElement('details');advanced.className='exercise-advanced';
+  const advancedSummary=document.createElement('summary');advancedSummary.textContent='Meer opties · RIR · uitleg';
+  advanced.append(advancedSummary);
+  const guide=[...content.querySelectorAll('p')];guide.forEach(el=>{if(el.textContent.includes('Uitvoering:')||el.textContent.includes('Mijn aandachtspunten:')||el.textContent.includes('Combinatieblok:'))advanced.appendChild(el)});
+  [...content.querySelectorAll('label')].filter(el=>el.textContent.includes('RIR (optioneel)')).forEach(el=>{const sel=el.nextElementSibling;advanced.appendChild(el);if(sel&&sel.matches('select[data-rir]'))advanced.appendChild(sel)});
+  const actions=content.querySelector('.actions');if(actions)advanced.appendChild(actions);
+  const rest=content.querySelector('.rest-label');if(rest)advanced.appendChild(rest);
+  content.appendChild(advanced);
+ });
  const completed=cards.filter(c=>isFinished(active.exercises[Number(c.dataset.sessionEx)]));
  const skipped=cards.filter(c=>active.exercises[Number(c.dataset.sessionEx)]?.skipped);
  for(const [title,group] of [['Afgeronde oefeningen',completed],['Overgeslagen oefeningen',skipped]]){
