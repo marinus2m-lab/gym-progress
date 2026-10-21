@@ -1,6 +1,6 @@
-const CACHE='gym-progress-cache-v3-9-3';
-const APP_VERSION='3.9.3';
-const ASSETS=['./','./index.html','./app.js?v=3.9.3','./cloud.js?v=3.9.3','./manifest.webmanifest','./icon.png','./icon-180.png','./icon-192.png','./icon-512.png','./fox-mark.png'];
+const CACHE='gym-progress-cache-v4-0-0';
+const APP_VERSION='4.0.0';
+const ASSETS=['./','./index.html','./app.js?v=4.0.0','./cloud.js?v=4.0.0','./manifest.webmanifest','./icon.png','./icon-180.png','./icon-192.png','./icon-512.png','./fox-mark.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)))});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('gym-progress-cache-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();if(event.data?.type==='GET_VERSION')event.ports?.[0]?.postMessage({version:APP_VERSION})});
